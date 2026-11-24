@@ -1,0 +1,85 @@
+name: build
+
+# Compila el motor de gráficos (graficos.js) con los plugins de la versión de Superset indicada.
+# El resultado queda como artifact "graficos-<versión>" de cada ejecución.
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  # Debe coincidir con la versión de Superset desplegada en superset-platform.
+  SUPERSET_VERSION: "6.1.0"
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  graficos:
+    name: Compilar graficos.js
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Código de este repo
+        uses: actions/checkout@v4
+        with:
+          path: superset-pdf
+
+      - name: Superset ${{ env.SUPERSET_VERSION }} (solo superset-frontend)
+        uses: actions/checkout@v4
+        with:
+          repository: apache/superset
+          ref: ${{ env.SUPERSET_VERSION }}
+          path: superset
+          fetch-depth: 1
+          sparse-checkout: superset-frontend
+
+      - name: Node (versión de .nvmrc de Superset)
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: superset/superset-frontend/.nvmrc
+          cache: npm
+          cache-dependency-path: superset/superset-frontend/package-lock.json
+
+      - name: Dependencias de superset-frontend
+        working-directory: superset/superset-frontend
+        run: npm ci --no-audit --no-fund
+
+      - name: Copiar el motor dentro de superset-frontend
+        run: |
+          mkdir -p superset/superset-frontend/pdf
+          cp -r superset-pdf/src/. superset/superset-frontend/pdf/
+          cp superset-pdf/build/webpack.pdf.js superset/superset-frontend/webpack.pdf.js
+
+      - name: Compilar
+        working-directory: superset/superset-frontend
+        env:
+          NODE_ENV: production
+          NODE_OPTIONS: --max_old_space_size=8192
+          PDF_OUT: ${{ github.workspace }}/dist
+          CI: "true"
+        run: npx webpack --config webpack.pdf.js --mode production
+
+      - name: Resumen
+        run: |
+          echo "${SUPERSET_VERSION}" > dist/SUPERSET_VERSION
+          ls -la dist dist/assets || true
+          {
+            echo "### graficos.js para Superset ${SUPERSET_VERSION}"
+            echo '```'
+            du -ah dist | sort -h | tail -20
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publicar artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: graficos-${{ env.SUPERSET_VERSION }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 30
