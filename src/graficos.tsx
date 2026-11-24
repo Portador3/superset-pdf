@@ -182,6 +182,11 @@ function renderChart(
     ...grafico.form_data,
     viz_type: grafico.viz_type,
     ...(coloresDashboard.esquema ? { color_scheme: coloresDashboard.esquema } : {}),
+    // En papel no hay buscador ni paginación: la tabla se dibuja de corrido y la plantilla
+    // decide cuántas filas caben.
+    ...(grafico.viz_type === VizType.Table
+      ? { include_search: false, page_length: 0, server_pagination: false }
+      : {}),
   };
   // El componente de ECharts lee el idioma y el estado del dashboard desde Redux.
   // isRefreshing=true además le quita la animación.
