@@ -190,6 +190,10 @@ function renderChart(
     dashboardState: { isRefreshing: true },
   }));
   const { SupersetThemeProvider } = themeObject as any;
+  // Sin filas, SuperChart muestra su aviso de "sin resultados" pero no llama a onRenderSuccess.
+  const sinDatos =
+    !grafico.queriesData ||
+    grafico.queriesData.every(q => !q || !Array.isArray(q.data) || q.data.length === 0);
 
   return new Promise<void>((resolve, reject) => {
     const limite = window.setTimeout(
@@ -229,6 +233,9 @@ function renderChart(
         </SupersetThemeProvider>
       </Provider>,
       elemento,
+      () => {
+        if (sinDatos) ok();
+      },
     );
   });
 }
