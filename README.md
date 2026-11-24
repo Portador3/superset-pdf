@@ -10,7 +10,7 @@ La maquetación del PDF (A4, encabezado, saltos de página) es nuestra.
 
 | Pieza | Dónde | Estado |
 |---|---|---|
-| Motor de gráficos `graficos.js` | `src/graficos.tsx` + `build/webpack.pdf.js`, compilado en Actions | Prueba |
+| Motor de gráficos `graficos.js` | `src/graficos.tsx` + `build/webpack.pdf.js`, compilado en Actions | Funciona (probado con big number, barras, torta y tabla) |
 | Extracción de datos (API de Superset) | — | Pendiente (se valida en una prueba local) |
 | Plantilla A4 + impresión con Playwright | — | Pendiente |
 | Imagen Docker en GHCR para `superset-platform` | — | Pendiente |

@@ -26,12 +26,12 @@ jobs:
     timeout-minutes: 45
     steps:
       - name: Código de este repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           path: superset-pdf
 
       - name: Superset ${{ env.SUPERSET_VERSION }} (solo superset-frontend)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: apache/superset
           ref: ${{ env.SUPERSET_VERSION }}
@@ -40,7 +40,7 @@ jobs:
           sparse-checkout: superset-frontend
 
       - name: Node (versión de .nvmrc de Superset)
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version-file: superset/superset-frontend/.nvmrc
           cache: npm
@@ -77,7 +77,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Publicar artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: graficos-${{ env.SUPERSET_VERSION }}
           path: dist/

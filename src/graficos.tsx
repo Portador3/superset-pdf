@@ -9,6 +9,7 @@
  *   aplicarColoresDashboard(metadata)    → esquema y colores por etiqueta del dashboard
  *   renderChart(elemento, grafico, tam)  → dibuja un gráfico; la promesa se resuelve al terminar
  */
+import './inicio';
 import ReactDOM from 'react-dom';
 import { Provider } from 'react-redux';
 import { createStore } from 'redux';
@@ -151,12 +152,18 @@ const HOOKS = {
   onLegendScroll: sinAccion,
 } as any;
 
-// Sin animaciones: el PDF se imprime cuando el gráfico ya está completo.
-function sinAnimacion(props: Json) {
-  if (props && props.echartOptions) {
-    return { ...props, echartOptions: { ...props.echartOptions, animation: false } };
-  }
-  return props;
+// Ajustes para papel: sin animaciones (se imprime cuando el gráfico ya está completo)
+// y sin los botones interactivos de la leyenda ("Todas" / "Inversa").
+function paraImprimir(props: Json) {
+  const op = props && props.echartOptions;
+  if (!op) return props;
+  const sinSelector = (l: Json) => ({ ...l, selector: false });
+  const legend = Array.isArray(op.legend)
+    ? op.legend.map(sinSelector)
+    : op.legend
+      ? sinSelector(op.legend)
+      : op.legend;
+  return { ...props, echartOptions: { ...op, animation: false, legend } };
 }
 
 const esperarCuadro = () => new Promise(r => requestAnimationFrame(() => r(null)));
@@ -213,7 +220,7 @@ function renderChart(
             datasource={grafico.datasource as any}
             hooks={HOOKS}
             theme={supersetTheme}
-            postTransformProps={sinAnimacion}
+            postTransformProps={paraImprimir}
             onRenderSuccess={ok}
             onRenderFailure={error}
             onErrorBoundary={error}
