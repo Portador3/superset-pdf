@@ -152,18 +152,104 @@ const HOOKS = {
   onLegendScroll: sinAccion,
 } as any;
 
-// Ajustes para papel: sin animaciones (se imprime cuando el gráfico ya está completo)
-// y sin los botones interactivos de la leyenda ("Todas" / "Inversa").
+// --- Leyenda completa en papel -------------------------------------------------------------
+// Superset usa una leyenda "scroll" (flechas para paginar) y reserva espacio para UNA línea.
+// En papel no se puede paginar: la leyenda pasa a "plain" (salta de línea o de columna) y se
+// agranda el margen del área del gráfico en lo que ocupen las líneas/columnas extra.
+const ALTO_FILA_LEYENDA = 24; // itemHeight (14) + itemGap (10) de ECharts por defecto
+let lienzoMedida: CanvasRenderingContext2D | null = null;
+
+function anchoTexto(texto: string, tamFuente = 12) {
+  if (!lienzoMedida) lienzoMedida = document.createElement('canvas').getContext('2d');
+  if (!lienzoMedida) return texto.length * tamFuente * 0.6;
+  lienzoMedida.font = `${tamFuente}px ${(supersetTheme as any).fontFamily || 'sans-serif'}`;
+  return lienzoMedida.measureText(texto).width;
+}
+
+function nombresLeyenda(op: Json, l: Json): string[] {
+  const datos = Array.isArray(l.data) && l.data.length ? l.data : null;
+  if (datos) return datos.map((d: any) => (typeof d === 'string' ? d : d && d.name)).filter(Boolean);
+  const series = Array.isArray(op.series) ? op.series : op.series ? [op.series] : [];
+  const nombres: string[] = [];
+  series.forEach((s: Json) => {
+    // En tortas/embudos la leyenda lista los datos, no la serie.
+    if (['pie', 'funnel'].includes(s.type) && Array.isArray(s.data)) {
+      s.data.forEach((d: Json) => d && d.name != null && nombres.push(String(d.name)));
+    } else if (s.name != null) {
+      nombres.push(String(s.name));
+    }
+  });
+  return Array.from(new Set(nombres));
+}
+
+const sumar = (v: any, extra: number) => (typeof v === 'number' ? v + extra : v == null ? extra : v);
+
+function leyendaCompleta(op: Json, l: Json, ancho: number, alto: number): { legend: Json; extra: Json } {
+  const legend = { ...l, selector: false };
+  if (l.show === false || l.type !== 'scroll' || !ancho || !alto) return { legend, extra: {} };
+  legend.type = 'plain';
+  const nombres = nombresLeyenda(op, l);
+  if (!nombres.length) return { legend, extra: {} };
+  const tam = (l.textStyle && l.textStyle.fontSize) || 12;
+  const gap = typeof l.itemGap === 'number' ? l.itemGap : 10;
+  const icono = (typeof l.itemWidth === 'number' ? l.itemWidth : 25) + 5;
+  const anchos = nombres.map(n => icono + anchoTexto(n, tam) + gap);
+  const horizontal = (l.orient || 'horizontal') === 'horizontal';
+
+  if (horizontal) {
+    const disponible = ancho - 20;
+    let filas = 1;
+    let x = 0;
+    anchos.forEach(w => {
+      if (x > 0 && x + w > disponible) { filas += 1; x = 0; }
+      x += w;
+    });
+    const extraAlto = (filas - 1) * ALTO_FILA_LEYENDA;
+    const abajo = l.bottom != null && l.top == null;
+    return { legend, extra: extraAlto ? { [abajo ? 'bottom' : 'top']: extraAlto } : {} };
+  }
+  const porColumna = Math.max(1, Math.floor((alto - 20) / ALTO_FILA_LEYENDA));
+  const columnas = Math.ceil(nombres.length / porColumna);
+  const extraAncho = (columnas - 1) * Math.max(...anchos);
+  const derecha = l.right != null && l.left == null;
+  return { legend, extra: extraAncho ? { [derecha ? 'right' : 'left']: extraAncho } : {} };
+}
+
+function aplicarMargen(op: Json, extra: Json) {
+  if (!Object.keys(extra).length) return op;
+  const res = { ...op };
+  const ajustarCaja = (caja: Json) => {
+    const c = { ...caja };
+    Object.entries(extra).forEach(([lado, v]) => { c[lado] = sumar(c[lado], v as number); });
+    return c;
+  };
+  if (op.grid) {
+    res.grid = Array.isArray(op.grid) ? op.grid.map(ajustarCaja) : ajustarCaja(op.grid);
+  } else if (op.series) {
+    // Sin grid (torta, embudo…): se reduce la caja de la serie.
+    const series = Array.isArray(op.series) ? op.series : [op.series];
+    res.series = series.map((s: Json) => ajustarCaja(s));
+  }
+  return res;
+}
+
+// Ajustes para papel: sin animaciones (se imprime cuando el gráfico ya está completo),
+// sin los botones de la leyenda ("Todas" / "Inversa") y con la leyenda completa.
 function paraImprimir(props: Json) {
   const op = props && props.echartOptions;
   if (!op) return props;
-  const sinSelector = (l: Json) => ({ ...l, selector: false });
-  const legend = Array.isArray(op.legend)
-    ? op.legend.map(sinSelector)
-    : op.legend
-      ? sinSelector(op.legend)
-      : op.legend;
-  return { ...props, echartOptions: { ...op, animation: false, legend } };
+  const ancho = props.width || 0;
+  const alto = props.height || 0;
+  let extra: Json = {};
+  let legend = op.legend;
+  if (Array.isArray(op.legend)) {
+    legend = op.legend.map((l: Json) => leyendaCompleta(op, l, ancho, alto).legend);
+  } else if (op.legend) {
+    const r = leyendaCompleta(op, op.legend, ancho, alto);
+    legend = r.legend;
+    extra = r.extra;
+  }
+  return { ...props, echartOptions: aplicarMargen({ ...op, animation: false, legend }, extra) };
 }
 
 const esperarCuadro = () => new Promise(r => requestAnimationFrame(() => r(null)));
