@@ -13,7 +13,7 @@ La maquetación del PDF (A4, encabezado, saltos de página) es nuestra.
 | Motor de gráficos `graficos.js` | `src/graficos.tsx` + `build/webpack.pdf.js`, compilado en Actions | Funciona (probado con big number, barras, torta y tabla) |
 | Extracción de datos (API de Superset) | — | Pendiente (se valida en una prueba local) |
 | Plantilla A4 + impresión con Playwright | — | Pendiente |
-| Imagen Docker en GHCR para `superset-platform` | — | Pendiente |
+| Servicio HTTP + imagen Docker | — | Pendiente |
 
 ## Cómo se compila
 
@@ -25,12 +25,12 @@ La maquetación del PDF (A4, encabezado, saltos de página) es nuestra.
 4. Compila con la configuración de webpack de Superset; solo cambian la entrada y la salida.
 5. Publica `dist/` (`graficos.js` + fuentes) como artifact `graficos-<versión>`.
 
-Al actualizar Superset en `superset-platform`, se cambia `SUPERSET_VERSION` en el workflow y se vuelve a compilar.
+Para otra versión de Superset, se cambia `SUPERSET_VERSION` en el workflow y se vuelve a compilar.
 
-Bajar la última compilación:
+Bajar la última compilación (desde un clon de este repo):
 
 ```bash
-gh run download -R Portador3/superset-pdf -n graficos-6.1.0 -D graficos
+gh run download -n graficos-6.1.0 -D graficos
 ```
 
 ## Uso de `graficos.js`
