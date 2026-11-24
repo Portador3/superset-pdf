@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 env:
-  # Debe coincidir con la versión de Superset desplegada en superset-platform.
+  # Debe coincidir con la versión del servidor Superset donde se usará.
   SUPERSET_VERSION: "6.1.0"
 
 concurrency:
