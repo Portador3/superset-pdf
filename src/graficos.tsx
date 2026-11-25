@@ -7,7 +7,10 @@
  * Expone `window.SupersetPDF`:
  *   init(opciones?)                      → configura idioma, formatos y colores (una vez)
  *   aplicarColoresDashboard(metadata)    → esquema y colores por etiqueta del dashboard
+ *   construirConsulta(grafico)           → query_context para POST /api/v1/chart/data, armado
+ *                                          desde los params igual que la pantalla (buildQuery)
  *   renderChart(elemento, grafico, tam)  → dibuja un gráfico; la promesa se resuelve al terminar
+ *   renderMarkdown(elemento, texto)      → markdown con el mismo componente de Superset
  */
 import './inicio';
 import ReactDOM from 'react-dom';
@@ -23,7 +26,11 @@ import {
   VizType,
   CategoricalColorNamespace,
   getChartMetadataRegistry,
+  getChartBuildQueryRegistry,
+  buildQueryContext,
 } from '@superset-ui/core';
+// Ruta directa: importar todo @superset-ui/core/components sumaría la librería de componentes completa.
+import { SafeMarkdown } from '@superset-ui/core/components/SafeMarkdown/SafeMarkdown';
 import {
   BigNumberChartPlugin,
   BigNumberTotalChartPlugin,
@@ -167,6 +174,51 @@ function paraImprimir(props: Json) {
   return { ...props, echartOptions: { ...op, animation: false, legend } };
 }
 
+/**
+ * Ajustes de papel sobre los params, iguales al consultar y al dibujar:
+ * - el esquema de colores del dashboard reemplaza al del gráfico (como en el dashboard);
+ * - leyenda "plain": salta de línea; Superset calcula filas y margen (getLegendLayoutResult);
+ * - tablas sin buscador ni paginación: se dibujan de corrido y la plantilla decide cuántas filas caben.
+ */
+function formDataImpresion(grafico: Grafico): Json {
+  return {
+    ...grafico.form_data,
+    viz_type: grafico.viz_type,
+    ...(coloresDashboard.esquema ? { color_scheme: coloresDashboard.esquema } : {}),
+    legendType: 'plain',
+    ...(grafico.viz_type === VizType.Table
+      ? { include_search: false, page_length: 0, server_pagination: false }
+      : {}),
+  };
+}
+
+/** Igual que buildV1ChartDataPayload de Superset: buildQuery del plugin o el genérico. */
+async function construirConsulta(grafico: Grafico): Promise<Json> {
+  if (!iniciado) init();
+  const formData = formDataImpresion(grafico);
+  const registrado = getChartBuildQueryRegistry().get(grafico.viz_type);
+  const buildQuery: any =
+    (registrado ? await registrado : undefined) ??
+    ((fd: Json) => buildQueryContext(fd as any, base => [{ ...base }]));
+  return buildQuery(
+    { ...formData, force: false, result_format: 'json', result_type: 'full' },
+    { ownState: {}, hooks: { setDataMask: sinAccion, setCachedChanges: sinAccion } },
+  );
+}
+
+function renderMarkdown(elemento: HTMLElement, texto: string): Promise<void> {
+  const { SupersetThemeProvider } = themeObject as any;
+  return new Promise(resolve => {
+    ReactDOM.render(
+      <SupersetThemeProvider>
+        <SafeMarkdown source={texto || ''} />
+      </SupersetThemeProvider>,
+      elemento,
+      () => resolve(),
+    );
+  });
+}
+
 const esperarCuadro = () => new Promise(r => requestAnimationFrame(() => r(null)));
 
 function renderChart(
@@ -179,19 +231,7 @@ function renderChart(
   if (!getChartMetadataRegistry().has(grafico.viz_type)) {
     return Promise.reject(new Error(`Tipo de gráfico no incluido en el PDF: ${grafico.viz_type}`));
   }
-  const formData = {
-    ...grafico.form_data,
-    viz_type: grafico.viz_type,
-    ...(coloresDashboard.esquema ? { color_scheme: coloresDashboard.esquema } : {}),
-    // En papel no se puede paginar la leyenda: "plain" salta de línea. Superset 6.1 calcula
-    // las filas y el margen (getLegendLayoutResult) y solo vuelve a "scroll" si ni así cabe.
-    legendType: 'plain',
-    // En papel no hay buscador ni paginación: la tabla se dibuja de corrido y la plantilla
-    // decide cuántas filas caben.
-    ...(grafico.viz_type === VizType.Table
-      ? { include_search: false, page_length: 0, server_pagination: false }
-      : {}),
-  };
+  const formData = formDataImpresion(grafico);
   // El componente de ECharts lee el idioma y el estado del dashboard desde Redux.
   // isRefreshing=true además le quita la animación.
   const store = createStore(() => ({
@@ -253,7 +293,9 @@ const api = {
   version: process.env.SUPERSET_VERSION || 'desconocida',
   init,
   aplicarColoresDashboard,
+  construirConsulta,
   renderChart,
+  renderMarkdown,
   tiposSoportados: () => PLUGINS.map(([, key]) => key),
 };
 

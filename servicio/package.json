@@ -1,0 +1,13 @@
+{
+  "name": "superset-pdf-servicio",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node servidor.mjs",
+    "prueba": "node pruebas/sintetica.mjs"
+  },
+  "dependencies": {
+    "playwright": "1.49.1"
+  }
+}
