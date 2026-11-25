@@ -63,6 +63,7 @@ export function cargarConfig() {
     maxCola: numero('PDF_MAX_COLA', 10, { min: 0, max: 1000 }),
     timeoutMs: numero('PDF_TIMEOUT_MS', 120000, { min: 5000 }),
     graficosParalelo: numero('PDF_CONSULTAS_PARALELAS', 8, { min: 1, max: 16 }),
+    metadatosSeg: numero('PDF_CACHE_METADATOS_SEG', 600, { min: 0, max: 86400 }),
 
     pagina,
     orientacion,

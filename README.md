@@ -72,6 +72,7 @@ Un gráfico que falla no detiene el PDF: su tarjeta muestra el error y se cuenta
 | `PDF_MAX_COLA` | `10` | Pedidos en espera; el resto recibe 429 |
 | `PDF_TIMEOUT_MS` | `120000` | Tiempo máximo por PDF |
 | `PDF_CONSULTAS_PARALELAS` | `8` | Consultas simultáneas a Superset por PDF |
+| `PDF_CACHE_METADATOS_SEG` | `600` | Segundos que se reutiliza la definición de cada gráfico (y su dataset) mientras no cambie en Superset; `0` la apaga. Los datos se piden siempre (los cachea Superset) |
 | `PDF_PAGINA` | `A4` | `A4`, `A3`, `Letter`, `Legal` |
 | `PDF_ORIENTACION` | `horizontal` | `horizontal` o `vertical` |
 | `PDF_ESCALA_ALTO` | `0.75` | Alto de los gráficos respecto del dashboard |

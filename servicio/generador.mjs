@@ -203,7 +203,9 @@ export function crearGenerador(cfg, { log = () => {} } = {}) {
     generar({ dashboardId, token, encabezado = {} }) {
       return enCola(() => imprimir(async (paginaLista, marcar) => {
         const api = clienteSuperset(cfg.supersetUrl, token);
-        const datos = await obtenerDashboard(api, dashboardId, { idioma: cfg.idioma, paralelo: cfg.graficosParalelo });
+        const datos = await obtenerDashboard(api, dashboardId, {
+          idioma: cfg.idioma, paralelo: cfg.graficosParalelo, metadatosSeg: cfg.metadatosSeg,
+        });
         datos.encabezado = encabezado;
         marcar('dashboard');
         const pagina = await paginaLista();
