@@ -36,6 +36,7 @@ async function principal() {
     const archivo = salida || `dashboard-${id}.pdf`;
     fs.writeFileSync(archivo, r.pdf);
     console.log(`"${r.datos.dashboard.titulo}": ${r.total - r.fallidos.length}/${r.total} gráficos · ${Date.now() - inicio} ms → ${archivo}`);
+    console.log(`  fases (ms): ${Object.entries(r.tiempos).map(([k, v]) => `${k}=${v}`).join(' ')}`);
     r.fallidos.forEach(f => console.log(`  ✗ [${f.id}] ${f.viz_type}: ${f.error}`));
     return r.fallidos.length ? 1 : 0;
   } finally {

@@ -62,7 +62,7 @@ export function cargarConfig() {
     concurrencia: numero('PDF_CONCURRENCIA', 1, { min: 1, max: 8 }),
     maxCola: numero('PDF_MAX_COLA', 10, { min: 0, max: 1000 }),
     timeoutMs: numero('PDF_TIMEOUT_MS', 120000, { min: 5000 }),
-    graficosParalelo: numero('PDF_CONSULTAS_PARALELAS', 4, { min: 1, max: 16 }),
+    graficosParalelo: numero('PDF_CONSULTAS_PARALELAS', 8, { min: 1, max: 16 }),
 
     pagina,
     orientacion,

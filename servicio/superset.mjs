@@ -42,9 +42,15 @@ export function clienteSuperset(base, token) {
 const parsear = s => (typeof s === 'string' && s ? JSON.parse(s) : s || {});
 
 /** Todo lo necesario para dibujar un dashboard, sin los datos de los gráficos. */
-export async function obtenerDashboard(api, id, { idioma, paralelo = 4 } = {}) {
-  const { result: dash } = await api.pedir(`/api/v1/dashboard/${encodeURIComponent(id)}`);
-  const { result: graficosDash } = await api.pedir(`/api/v1/dashboard/${encodeURIComponent(id)}/charts`);
+export async function obtenerDashboard(api, id, { idioma, paralelo = 8 } = {}) {
+  // Todo lo que no depende de otra respuesta se pide a la vez.
+  const pIdioma = idioma && idioma !== 'en'
+    ? api.pedir(`/superset/language_pack/${idioma}/`, { conToken: false }).catch(() => undefined) // sin él: inglés
+    : Promise.resolve(undefined);
+  const [{ result: dash }, { result: graficosDash }] = await Promise.all([
+    api.pedir(`/api/v1/dashboard/${encodeURIComponent(id)}`),
+    api.pedir(`/api/v1/dashboard/${encodeURIComponent(id)}/charts`),
+  ]);
 
   const graficos = await enParalelo(graficosDash, paralelo, async g => {
     const base = { id: g.id, slice_name: g.slice_name, viz_type: g.form_data && g.form_data.viz_type };
@@ -66,12 +72,7 @@ export async function obtenerDashboard(api, id, { idioma, paralelo = 4 } = {}) {
     }
   });
 
-  let languagePack;
-  if (idioma && idioma !== 'en') {
-    try {
-      languagePack = await api.pedir(`/superset/language_pack/${idioma}/`, { conToken: false });
-    } catch { /* sin traducción: se usa inglés */ }
-  }
+  const languagePack = await pIdioma;
 
   return {
     generado: new Date().toISOString(),

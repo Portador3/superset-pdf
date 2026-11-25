@@ -71,7 +71,7 @@ Un gráfico que falla no detiene el PDF: su tarjeta muestra el error y se cuenta
 | `PDF_CONCURRENCIA` | `1` | PDF en paralelo (Chromium usa ~300–500 MB por PDF) |
 | `PDF_MAX_COLA` | `10` | Pedidos en espera; el resto recibe 429 |
 | `PDF_TIMEOUT_MS` | `120000` | Tiempo máximo por PDF |
-| `PDF_CONSULTAS_PARALELAS` | `4` | Consultas simultáneas a Superset por PDF |
+| `PDF_CONSULTAS_PARALELAS` | `8` | Consultas simultáneas a Superset por PDF |
 | `PDF_PAGINA` | `A4` | `A4`, `A3`, `Letter`, `Legal` |
 | `PDF_ORIENTACION` | `horizontal` | `horizontal` o `vertical` |
 | `PDF_ESCALA_ALTO` | `0.75` | Alto de los gráficos respecto del dashboard |

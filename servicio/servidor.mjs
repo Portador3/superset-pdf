@@ -83,7 +83,8 @@ const servidor = http.createServer(async (req, res) => {
 
     const inicio = Date.now();
     const r = await generador.generar({ dashboardId, token, encabezado });
-    log(`pdf dashboard=${dashboardId} graficos=${r.total} fallidos=${r.fallidos.length} ms=${Date.now() - inicio}`);
+    const fases = Object.entries(r.tiempos || {}).map(([k, v]) => `${k}=${v}`).join(' ');
+    log(`pdf dashboard=${dashboardId} graficos=${r.total} fallidos=${r.fallidos.length} ms=${Date.now() - inicio} ${fases}`);
     res.writeHead(200, {
       'Content-Type': 'application/pdf',
       'Content-Length': r.pdf.length,
@@ -106,7 +107,10 @@ const servidor = http.createServer(async (req, res) => {
   }
 });
 
-servidor.listen(cfg.puerto, () => log(`superset-pdf escuchando en :${cfg.puerto} (Superset ${cfg.versionSuperset || '?'}) → ${cfg.supersetUrl}`));
+servidor.listen(cfg.puerto, () => {
+  log(`superset-pdf escuchando en :${cfg.puerto} (Superset ${cfg.versionSuperset || '?'}) → ${cfg.supersetUrl}`);
+  generador.precalentar(); // Chromium y una página listos antes del primer pedido
+});
 
 for (const senal of ['SIGINT', 'SIGTERM']) {
   process.on(senal, async () => {

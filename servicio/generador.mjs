@@ -63,17 +63,25 @@ export function crearGenerador(cfg, { log = () => {} } = {}) {
   ].filter(Boolean).join(';');
 
   let navegador = null;
+  let cerrado = false;
   async function obtenerNavegador() {
+    if (cerrado) throw new Error('Generador cerrado');
     if (navegador && navegador.isConnected()) return navegador;
     navegador = await chromium.launch({
       // Las fuentes de graficos.js se cargan desde archivos locales; /dev/shm suele ser chico en contenedores.
-      args: ['--allow-file-access-from-files', '--disable-dev-shm-usage'],
+      // Los tres últimos evitan que Chromium frene los temporizadores de la página de reserva mientras espera.
+      args: [
+        '--allow-file-access-from-files', '--disable-dev-shm-usage',
+        '--disable-background-timer-throttling', '--disable-backgrounding-occluded-windows',
+        '--disable-renderer-backgrounding',
+      ],
     });
     navegador.on('disconnected', () => { navegador = null; });
     return navegador;
   }
 
-  async function imprimir(obtenerDatosDashboard) {
+  /** Contexto nuevo con la plantilla, graficos.js (~5 MB) y maquetar.js ya cargados. Cada PDF usa uno y lo cierra. */
+  async function prepararPagina() {
     const nav = await obtenerNavegador();
     const contexto = await nav.newContext({
       deviceScaleFactor: 2, // ECharts dibuja en canvas: al doble de resolución queda nítido al imprimir
@@ -88,14 +96,51 @@ export function crearGenerador(cfg, { log = () => {} } = {}) {
       await pagina.addStyleTag({ content: `:root{${variablesCss}}` });
       if (cssExtra) await pagina.addStyleTag({ content: cssExtra });
       await pagina.emulateMedia({ media: 'print' });
+      return { contexto, pagina };
+    } catch (e) {
+      await contexto.close().catch(() => {});
+      throw e;
+    }
+  }
 
-      const datos = await obtenerDatosDashboard(pagina);
+  // Una página ya preparada espera al próximo pedido (se repone al terminar cada PDF): ahorra ~1 s por PDF.
+  let reserva = null;
+  function reponerReserva() {
+    if (cerrado || reserva) return;
+    reserva = prepararPagina();
+    reserva.catch(() => { reserva = null; });
+  }
+  async function tomarPagina() {
+    const lista = reserva;
+    reserva = null;
+    if (lista) {
+      try {
+        const p = await lista;
+        if (!p.pagina.isClosed()) return p;
+      } catch { /* se prepara otra */ }
+    }
+    return prepararPagina();
+  }
+
+  async function imprimir(obtenerDatosDashboard) {
+    // Milisegundos de cada fase, para el log: dónde se va el tiempo de un PDF.
+    const tiempos = {};
+    let desde = Date.now();
+    const marcar = fase => { const ahora = Date.now(); tiempos[fase] = ahora - desde; desde = ahora; };
+    // La página se prepara mientras se piden los datos a Superset (no dependen una de otra).
+    const pPagina = tomarPagina();
+    pPagina.catch(() => {});
+    try {
+      const paginaLista = async () => (await pPagina).pagina;
+      const datos = await obtenerDatosDashboard(paginaLista, marcar);
+      const pagina = await paginaLista();
 
       const cargarFuentes = () => pagina.evaluate(() =>
         Promise.all([...document.fonts].map(f => f.load().catch(() => null))));
       await cargarFuentes();
       const resultados = await pagina.evaluate(([d, op]) => window.armar(d, op), [datos, opcionesPagina]);
       await cargarFuentes();
+      marcar('dibujo');
 
       const pie = `<span>${[cfg.pie, datos.dashboard.titulo].filter(Boolean).map(escapar).join('  |  ')}</span>`;
       // El pie no hereda estilos de la página: la fuente y los colores van en línea.
@@ -111,10 +156,13 @@ export function crearGenerador(cfg, { log = () => {} } = {}) {
           font-family:${fuentePie};font-size:7.5px;color:#64748b;display:flex;justify-content:space-between">
           ${pie}<span style="font-weight:bold">${PIE_PAGINA[cfg.idioma] || PIE_PAGINA.en}</span></div>`,
       });
+      marcar('pdf');
       const fallidos = resultados.filter(r => !r.ok);
-      return { pdf, datos, total: resultados.length, fallidos };
+      return { pdf, datos, total: resultados.length, fallidos, tiempos };
     } finally {
-      await contexto.close().catch(() => {});
+      const p = await pPagina.catch(() => null);
+      if (p) await p.contexto.close().catch(() => {});
+      reponerReserva();
     }
   }
 
@@ -153,13 +201,17 @@ export function crearGenerador(cfg, { log = () => {} } = {}) {
 
     /** Pide todo a Superset con el token de quien llama y genera el PDF. */
     generar({ dashboardId, token, encabezado = {} }) {
-      return enCola(() => imprimir(async pagina => {
+      return enCola(() => imprimir(async (paginaLista, marcar) => {
         const api = clienteSuperset(cfg.supersetUrl, token);
         const datos = await obtenerDashboard(api, dashboardId, { idioma: cfg.idioma, paralelo: cfg.graficosParalelo });
         datos.encabezado = encabezado;
+        marcar('dashboard');
+        const pagina = await paginaLista();
+        marcar('navegador'); // solo lo que faltaba para tener la página lista
         // Las consultas se arman en el navegador con buildQuery (igual que la pantalla) y se ejecutan aquí.
         const consultas = await pagina.evaluate(([d, op]) => window.prepararConsultas(d, op), [datos, opcionesPagina]);
         await obtenerDatos(api, datos, consultas, cfg.graficosParalelo);
+        marcar('consultas');
         return datos;
       }));
     },
@@ -169,7 +221,13 @@ export function crearGenerador(cfg, { log = () => {} } = {}) {
       return enCola(() => imprimir(async () => datos));
     },
 
+    /** Lanza Chromium y deja una página lista antes del primer pedido (el servicio lo llama al arrancar). */
+    precalentar() {
+      reponerReserva();
+    },
+
     async cerrar() {
+      cerrado = true;
       if (navegador) await navegador.close().catch(() => {});
     },
   };
