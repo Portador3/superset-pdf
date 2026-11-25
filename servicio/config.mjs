@@ -46,6 +46,11 @@ export function cargarConfig() {
   const idioma = (process.env.PDF_IDIOMA || 'es').toLowerCase();
   const colorTitulos = process.env.PDF_COLOR_TITULOS || '';
   if (colorTitulos && !/^#[0-9a-fA-F]{3,8}$/.test(colorTitulos)) throw new Error('PDF_COLOR_TITULOS: color #RRGGBB');
+  const colorAcento = process.env.PDF_COLOR_ACENTO || '';
+  if (colorAcento && !/^#[0-9a-fA-F]{3,8}$/.test(colorAcento)) throw new Error('PDF_COLOR_ACENTO: color #RRGGBB');
+  // Fuente de todo el PDF (textos, tablas y gráficos). Por defecto una estándar: Arial (Liberation Sans en Linux).
+  const fuente = process.env.PDF_FUENTE || 'Arial, Helvetica, "Liberation Sans", sans-serif';
+  if (!/^[\w\s,"'-]+$/.test(fuente)) throw new Error('PDF_FUENTE: lista de familias, p. ej. Arial, sans-serif');
 
   const graficosDir = process.env.PDF_GRAFICOS_DIR
     || primerExistente([path.join(AQUI, 'graficos'), path.join(AQUI, '..', 'dist')]);
@@ -73,7 +78,11 @@ export function cargarConfig() {
     logo: archivoOpcional('PDF_LOGO'),
     css: archivoOpcional('PDF_CSS'),
     colorTitulos,
+    colorAcento,
+    fuente,
     pie: process.env.PDF_PIE || '',
+    institucion: process.env.PDF_INSTITUCION || '',
+    etiquetaZona: process.env.PDF_ZONA_ETIQUETA || '',
 
     graficosJs: path.join(graficosDir, 'graficos.js'),
     plantillaDir: path.join(AQUI, 'plantilla'),

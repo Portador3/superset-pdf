@@ -9,14 +9,20 @@
 
   const TEXTOS = {
     es: {
-      generado: (fecha, hora) => `Generado el ${fecha} a las ${hora}`,
+      etiqueta: 'Reporte de dashboard',
+      fuente: 'Fuente:',
+      filtros: 'Filtros aplicados:',
+      sinFiltros: 'ninguno (estado guardado del dashboard)',
       filas: (n, total) => `Mostrando ${n} de ${total} filas`,
       sinDatos: 'Sin datos para este gráfico',
       grafico: id => `Gráfico ${id}`,
       pestana: 'Pestaña',
     },
     en: {
-      generado: (fecha, hora) => `Generated on ${fecha} at ${hora}`,
+      etiqueta: 'Dashboard report',
+      fuente: 'Source:',
+      filtros: 'Applied filters:',
+      sinFiltros: 'none (saved state of the dashboard)',
       filas: (n, total) => `Showing ${n} of ${total} rows`,
       sinDatos: 'No data for this chart',
       grafico: id => `Chart ${id}`,
@@ -153,7 +159,7 @@
   }
 
   function iniciar(datos, op) {
-    SupersetPDF.init({ languagePack: datos.languagePack, locale: op.localeGraficos });
+    SupersetPDF.init({ languagePack: datos.languagePack, locale: op.localeGraficos, fuente: op.fuente });
     SupersetPDF.aplicarColoresDashboard(datos.dashboard.metadata || {});
   }
 
@@ -177,24 +183,47 @@
     hoja.style.width = op.anchoPx + 'px';
     const { nodo, tareas, textos, ANCHO } = crearMaquetador(datos, op);
 
-    const portada = el('div', op.logo ? 'portada' : 'portada sin-logo');
+    // Cabecera: logo a la izquierda; tipo de reporte, institución y fecha a la derecha; debajo título, descripción,
+    // detalles ("Etiqueta: valor") y filtros.
+    const portada = el('div', 'portada');
+    const superior = el('div', 'portada-superior');
     let logo = null;
     if (op.logo) {
-      logo = el('img');
+      logo = el('img', 'logo');
       logo.src = op.logo;
       logo.alt = '';
-      portada.appendChild(logo);
+      superior.appendChild(logo);
     }
-    const titulos = el('div', 'titulos');
-    titulos.appendChild(el('h1', null, datos.dashboard.titulo));
+    const derecha = el('div', 'portada-derecha');
+    derecha.appendChild(el('div', 'etiqueta', textos.etiqueta));
+    if (op.institucion) derecha.appendChild(el('div', null, op.institucion));
     const f = new Date(datos.generado);
-    const loc = op.locale;
-    const zona = op.zonaHoraria;
-    titulos.appendChild(el('div', 'meta', textos.generado(
-      f.toLocaleDateString(loc, { day: '2-digit', month: 'long', year: 'numeric', timeZone: zona }),
-      f.toLocaleTimeString(loc, { hour: '2-digit', minute: '2-digit', timeZone: zona }),
-    )));
-    portada.appendChild(titulos);
+    const fecha = f.toLocaleString(op.locale, {
+      day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false,
+      timeZone: op.zonaHoraria,
+    });
+    derecha.appendChild(el('div', null, op.etiquetaZona ? `${fecha} (${op.etiquetaZona})` : fecha));
+    superior.appendChild(derecha);
+    portada.appendChild(superior);
+
+    const enc = datos.encabezado || {};
+    portada.appendChild(el('h1', null, datos.dashboard.titulo));
+    if (enc.descripcion) portada.appendChild(el('p', 'descripcion', enc.descripcion));
+    const linea = pares => {
+      const d = el('div', 'datos');
+      pares.forEach(([etiqueta, valor]) => {
+        const par = el('span', 'par');
+        par.appendChild(el('b', null, etiqueta));
+        par.appendChild(document.createTextNode(' ' + valor));
+        d.appendChild(par);
+      });
+      return d;
+    };
+    portada.appendChild(linea([
+      ...(enc.detalles || []).map(x => [/:$/.test(x.etiqueta) ? x.etiqueta : `${x.etiqueta}:`, x.valor]),
+      [textos.fuente, 'Apache Superset'],
+    ]));
+    portada.appendChild(linea([[textos.filtros, textos.sinFiltros]]));
     hoja.appendChild(portada);
     if (logo) await new Promise(r => (logo.complete ? r() : (logo.onload = logo.onerror = r)));
 

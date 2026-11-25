@@ -2,7 +2,7 @@
 //   node pruebas/sintetica.mjs [salida.pdf]
 import fs from 'node:fs';
 import { cargarConfig } from '../config.mjs';
-import { crearGenerador } from '../generador.mjs';
+import { crearGenerador, leerEncabezado } from '../generador.mjs';
 
 const meses = [...Array(12)].map((_, i) => Date.UTC(2025, i, 1));
 const categorias = ['Alfa', 'Beta', 'Gamma', 'Delta', 'Épsilon'];
@@ -11,6 +11,10 @@ const valor = (i, k = 1) => Math.round(1000 * k + 400 * Math.sin(i * k) + 37 * i
 
 const datos = {
   generado: new Date().toISOString(),
+  encabezado: leerEncabezado({
+    descripcion: 'Dashboard inventado con los casos difíciles: leyendas largas, tablas anchas, pestañas y markdown.',
+    detalles: [{ etiqueta: 'Módulo', valor: 'Pruebas' }, { etiqueta: 'Generado por', valor: 'CI' }],
+  }),
   dashboard: {
     id: 'sintetico',
     titulo: 'Prueba sintética',

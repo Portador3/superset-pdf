@@ -16,6 +16,29 @@ const PIE_PAGINA = {
 export class ErrorCola extends Error {}
 export class ErrorTiempo extends Error {}
 
+const texto = (v, max, nombre) => {
+  if (v == null || v === '') return '';
+  if (typeof v !== 'string') throw new Error(`${nombre} debe ser texto`);
+  return v.trim().slice(0, max);
+};
+
+/**
+ * Datos opcionales de la cabecera que manda quien llama (no los conoce Superset):
+ *   { descripcion?: string, detalles?: [{ etiqueta, valor }] }   p. ej. [{ etiqueta: 'Generado por', valor: 'Ana' }]
+ */
+export function leerEncabezado(e) {
+  if (e == null) return {};
+  if (typeof e !== 'object' || Array.isArray(e)) throw new Error('encabezado debe ser un objeto');
+  const detalles = e.detalles == null ? [] : e.detalles;
+  if (!Array.isArray(detalles) || detalles.length > 6) throw new Error('detalles: lista de hasta 6 elementos');
+  return {
+    descripcion: texto(e.descripcion, 400, 'descripcion'),
+    detalles: detalles
+      .map(d => ({ etiqueta: texto(d && d.etiqueta, 40, 'etiqueta'), valor: texto(d && d.valor, 160, 'valor') }))
+      .filter(d => d.etiqueta && d.valor),
+  };
+}
+
 export function crearGenerador(cfg, { log = () => {} } = {}) {
   if (!fs.existsSync(cfg.graficosJs)) throw new Error(`No existe ${cfg.graficosJs} (compilación de graficos.js)`);
   const logo = cfg.logo ? aDataUri(cfg.logo) : null;
@@ -28,8 +51,16 @@ export function crearGenerador(cfg, { log = () => {} } = {}) {
     locale: cfg.locale,
     zonaHoraria: cfg.zonaHoraria,
     localeGraficos: cfg.localeGraficos,
+    fuente: cfg.fuente,
+    institucion: cfg.institucion,
+    etiquetaZona: cfg.etiquetaZona,
     logo,
   };
+  const variablesCss = [
+    `--pdf-fuente:${cfg.fuente}`,
+    cfg.colorTitulos && `--pdf-color-titulos:${cfg.colorTitulos}`,
+    cfg.colorAcento && `--pdf-color-acento:${cfg.colorAcento}`,
+  ].filter(Boolean).join(';');
 
   let navegador = null;
   async function obtenerNavegador() {
@@ -54,7 +85,7 @@ export function crearGenerador(cfg, { log = () => {} } = {}) {
       await pagina.goto(pathToFileURL(path.join(cfg.plantillaDir, 'pagina.html')).href);
       await pagina.addScriptTag({ url: pathToFileURL(cfg.graficosJs).href });
       await pagina.addScriptTag({ url: pathToFileURL(path.join(cfg.plantillaDir, 'maquetar.js')).href });
-      if (cfg.colorTitulos) await pagina.addStyleTag({ content: `:root{--pdf-color-titulos:${cfg.colorTitulos}}` });
+      await pagina.addStyleTag({ content: `:root{${variablesCss}}` });
       if (cssExtra) await pagina.addStyleTag({ content: cssExtra });
       await pagina.emulateMedia({ media: 'print' });
 
@@ -66,8 +97,9 @@ export function crearGenerador(cfg, { log = () => {} } = {}) {
       const resultados = await pagina.evaluate(([d, op]) => window.armar(d, op), [datos, opcionesPagina]);
       await cargarFuentes();
 
-      const pie = cfg.pie ? `<span>${escapar(cfg.pie)} · ${escapar(datos.dashboard.titulo)}</span>`
-        : `<span>${escapar(datos.dashboard.titulo)}</span>`;
+      const pie = `<span>${[cfg.pie, datos.dashboard.titulo].filter(Boolean).map(escapar).join('  |  ')}</span>`;
+      // El pie no hereda estilos de la página: la fuente y los colores van en línea.
+      const fuentePie = escapar(cfg.fuente);
       const pdf = await pagina.pdf({
         format: cfg.pagina,
         landscape: cfg.orientacion === 'horizontal',
@@ -75,9 +107,9 @@ export function crearGenerador(cfg, { log = () => {} } = {}) {
         margin: { top: '12mm', right: '12mm', bottom: '14mm', left: '12mm' },
         displayHeaderFooter: true,
         headerTemplate: '<span></span>',
-        footerTemplate: `<div style="width:100%;margin:0 12mm;font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;
-          font-size:7.5px;color:#6b7280;display:flex;justify-content:space-between">
-          ${pie}<span>${PIE_PAGINA[cfg.idioma] || PIE_PAGINA.en}</span></div>`,
+        footerTemplate: `<div style="width:100%;margin:0 12mm;padding-top:1.6mm;border-top:0.3mm solid #e2e8f0;
+          font-family:${fuentePie};font-size:7.5px;color:#64748b;display:flex;justify-content:space-between">
+          ${pie}<span style="font-weight:bold">${PIE_PAGINA[cfg.idioma] || PIE_PAGINA.en}</span></div>`,
       });
       const fallidos = resultados.filter(r => !r.ok);
       return { pdf, datos, total: resultados.length, fallidos };
@@ -120,10 +152,11 @@ export function crearGenerador(cfg, { log = () => {} } = {}) {
     estado: () => ({ enCurso, enEspera: espera.length }),
 
     /** Pide todo a Superset con el token de quien llama y genera el PDF. */
-    generar({ dashboardId, token }) {
+    generar({ dashboardId, token, encabezado = {} }) {
       return enCola(() => imprimir(async pagina => {
         const api = clienteSuperset(cfg.supersetUrl, token);
         const datos = await obtenerDashboard(api, dashboardId, { idioma: cfg.idioma, paralelo: cfg.graficosParalelo });
+        datos.encabezado = encabezado;
         // Las consultas se arman en el navegador con buildQuery (igual que la pantalla) y se ejecutan aquí.
         const consultas = await pagina.evaluate(([d, op]) => window.prepararConsultas(d, op), [datos, opcionesPagina]);
         await obtenerDatos(api, datos, consultas, cfg.graficosParalelo);

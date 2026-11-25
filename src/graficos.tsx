@@ -86,6 +86,8 @@ export interface OpcionesInit {
   /** D3_FORMAT y D3_TIME_FORMAT de superset_config (opcionales) */
   d3Format?: Json;
   d3TimeFormat?: Json;
+  /** Familia de letra de los gráficos (CSS font-family), p. ej. 'Arial, sans-serif'. Por defecto, la de Superset. */
+  fuente?: string;
 }
 
 // Solo tipos de gráfico, sin filtros nativos ni vistas de la aplicación.
@@ -124,6 +126,7 @@ const PLUGINS: [any, string][] = [
 
 let iniciado = false;
 let localeEcharts = 'EN';
+let fuenteGraficos: string | undefined;
 let coloresDashboard: { esquema?: string } = {};
 
 function init(op: OpcionesInit = {}) {
@@ -133,6 +136,15 @@ function init(op: OpcionesInit = {}) {
   setupColors();
   PLUGINS.forEach(([Plugin, key]) => new Plugin().configure({ key }).register());
   if (op.locale) localeEcharts = op.locale.toUpperCase();
+  if (op.fuente) {
+    fuenteGraficos = op.fuente;
+    // Los plugins leen la letra del tema de Superset (ejes, etiquetas, big number).
+    try {
+      (supersetTheme as any).fontFamily = op.fuente;
+    } catch {
+      // tema de solo lectura: queda textStyle de ECharts (paraImprimir) y el CSS de la plantilla
+    }
+  }
   iniciado = true;
 }
 
@@ -171,7 +183,8 @@ function paraImprimir(props: Json) {
     : op.legend
       ? sinSelector(op.legend)
       : op.legend;
-  return { ...props, echartOptions: { ...op, animation: false, legend } };
+  const textStyle = fuenteGraficos ? { ...(op.textStyle || {}), fontFamily: fuenteGraficos } : op.textStyle;
+  return { ...props, echartOptions: { ...op, animation: false, legend, textStyle } };
 }
 
 /**

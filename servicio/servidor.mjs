@@ -1,10 +1,11 @@
 // Servicio HTTP:
 //   POST /pdf   { "dashboard_id": 13, "token": "<access token de Superset>" }  → application/pdf
+//               opcional: "encabezado": { "descripcion": "…", "detalles": [{ "etiqueta": "…", "valor": "…" }] }
 //   GET  /salud                                                                → estado
 import http from 'node:http';
 import crypto from 'node:crypto';
 import { cargarConfig } from './config.mjs';
-import { crearGenerador, ErrorCola, ErrorTiempo } from './generador.mjs';
+import { crearGenerador, ErrorCola, ErrorTiempo, leerEncabezado } from './generador.mjs';
 import { ErrorSuperset } from './superset.mjs';
 
 const cfg = cargarConfig();
@@ -73,9 +74,15 @@ const servidor = http.createServer(async (req, res) => {
       return responderJson(res, 400, { error: 'dashboard_id_invalido' });
     }
     if (typeof token !== 'string' || token.length < 10) return responderJson(res, 400, { error: 'token_requerido' });
+    let encabezado;
+    try {
+      encabezado = leerEncabezado(cuerpo.encabezado);
+    } catch (e) {
+      return responderJson(res, 400, { error: 'encabezado_invalido', detalle: e.message });
+    }
 
     const inicio = Date.now();
-    const r = await generador.generar({ dashboardId, token });
+    const r = await generador.generar({ dashboardId, token, encabezado });
     log(`pdf dashboard=${dashboardId} graficos=${r.total} fallidos=${r.fallidos.length} ms=${Date.now() - inicio}`);
     res.writeHead(200, {
       'Content-Type': 'application/pdf',

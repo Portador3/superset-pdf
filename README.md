@@ -34,14 +34,25 @@ La etiqueta de la imagen es la **versión de Superset** con la que es compatible
 
 | Método | Ruta | Respuesta |
 |---|---|---|
-| `POST` | `/pdf` | Cuerpo JSON `{"dashboard_id": <número o slug>, "token": "<access token>"}` → `200 application/pdf`. Cabeceras `X-Graficos-Total` y `X-Graficos-Fallidos` |
+| `POST` | `/pdf` | Cuerpo JSON `{"dashboard_id": <número o slug>, "token": "<access token>"}` → `200 application/pdf`. Cabeceras `X-Graficos-Total` y `X-Graficos-Fallidos`. Opcional `"encabezado"` (ver abajo) |
 | `GET` | `/salud` | `{"ok": true, "superset": "6.1.0", "enCurso": 0, "enEspera": 0}` |
+
+`encabezado` agrega a la cabecera datos que Superset no conoce (todos opcionales):
+
+```json
+"encabezado": {
+  "descripcion": "Texto bajo el título (hasta 400 caracteres)",
+  "detalles": [{ "etiqueta": "Generado por", "valor": "Ana Pérez" }, { "etiqueta": "Área", "valor": "Finanzas" }]
+}
+```
+
+`detalles` admite hasta 6 pares; se muestran en una línea como "**Etiqueta:** valor", seguidos de "Fuente: Apache Superset".
 
 Errores (JSON `{"error": …}`):
 
 | Código | Cuándo |
 |---|---|
-| 400 | Falta `dashboard_id` o `token` |
+| 400 | Falta `dashboard_id` o `token`, o `encabezado` no tiene el formato de arriba |
 | 401 | `PDF_CLAVE_API` configurada y `X-Api-Key` incorrecta, o Superset rechazó el token |
 | 403 / 404 | Lo que respondió Superset para ese dashboard |
 | 429 | Cola llena |
@@ -68,7 +79,11 @@ Un gráfico que falla no detiene el PDF: su tarjeta muestra el error y se cuenta
 | `PDF_LOCALE` | `es` | Formato de la fecha de generación |
 | `PDF_ZONA_HORARIA` | `TZ` o `UTC` | Zona horaria de la fecha de generación, p. ej. `America/Lima` |
 | `PDF_LOGO` | — | Ruta a un logo (png, jpg, svg, webp) montado en el contenedor |
-| `PDF_COLOR_TITULOS` | `#1f2937` | Color de títulos (`#RRGGBB`) |
+| `PDF_COLOR_TITULOS` | `#0f172a` | Color de títulos (`#RRGGBB`) |
+| `PDF_COLOR_ACENTO` | `#475569` | Color de la etiqueta "Reporte de dashboard" de la cabecera |
+| `PDF_FUENTE` | `Arial, Helvetica, "Liberation Sans", sans-serif` | Familia de letra de todo el PDF, gráficos incluidos |
+| `PDF_INSTITUCION` | — | Nombre que va en la cabecera, sobre la fecha |
+| `PDF_ZONA_ETIQUETA` | — | Texto entre paréntesis tras la fecha, p. ej. `hora de Lima` |
 | `PDF_PIE` | — | Texto del pie de página (antes del título) |
 | `PDF_CSS` | — | Ruta a un CSS adicional montado en el contenedor (ver `servicio/plantilla/base.css`) |
 
@@ -80,8 +95,9 @@ pdf:
   environment:
     SUPERSET_URL: http://superset:8088
     PDF_LOGO: /marca/logo.png
-    PDF_COLOR_TITULOS: "#1e3c8f"
-    PDF_PIE: Mi organización
+    PDF_COLOR_ACENTO: "#1e3c8f"
+    PDF_INSTITUCION: Mi organización
+    PDF_PIE: Mi organización | Uso interno
     PDF_ZONA_HORARIA: America/Lima
   volumes:
     - ./marca:/marca:ro
@@ -103,7 +119,10 @@ pdf:
 - **Papel**: sin animaciones; leyenda que salta de línea en vez de paginar (el cálculo es el de Superset);
   tablas sin buscador ni paginación; si una tabla es más ancha que su tarjeta, se reduce; las filas que no caben
   se ocultan con la nota "Mostrando N de M filas".
-- Una sola familia de letra en todo el PDF: la del sistema, la misma que usan los gráficos.
+- Una sola familia de letra en todo el PDF (`PDF_FUENTE`, Arial por defecto), gráficos y tablas incluidos.
+- Fondo blanco: cada gráfico va en una tarjeta con borde fino, sin el gris del tablero de Superset.
+- Cabecera en la primera página (logo, tipo de reporte, institución, fecha, título, descripción, detalles y filtros) y
+  pie con el texto de `PDF_PIE`, el título y "Página N de M" en todas.
 
 ## Limitaciones
 

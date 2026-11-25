@@ -1,11 +1,13 @@
-/* Estilo neutro. Cada despliegue puede sumar el suyo con PDF_CSS (archivo montado). */
+/* Estilo neutro sobre fondo blanco. Cada despliegue puede sumar el suyo con PDF_CSS (archivo montado). */
 :root {
-  --pdf-color-titulos: #1f2937;
-  --pdf-texto: #111827;
-  --pdf-texto-suave: #6b7280;
-  --pdf-borde: #e5e7eb;
-  /* Misma familia que los gráficos y tablas de Superset (fuente del sistema): una sola letra en todo el PDF. */
-  --pdf-fuente: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  --pdf-color-titulos: #0f172a;
+  --pdf-color-acento: #475569;
+  --pdf-texto: #0f172a;
+  --pdf-texto-suave: #475569;
+  --pdf-texto-tenue: #64748b;
+  --pdf-borde: #e2e8f0;
+  /* Una sola familia en todo el PDF (textos, tablas y gráficos). La fija el generador con PDF_FUENTE. */
+  --pdf-fuente: Arial, Helvetica, "Liberation Sans", sans-serif;
 }
 
 * { box-sizing: border-box; }
@@ -15,25 +17,32 @@ html, body {
 }
 #hoja { overflow: hidden; }
 
-.portada { display: flex; align-items: center; gap: 20px; margin-bottom: 18px; }
-.portada img { height: 48px; width: auto; }
-.portada .titulos { flex: 1; text-align: right; }
-.portada.sin-logo .titulos { text-align: left; }
-.portada h1 { font-size: 20px; font-weight: 600; color: var(--pdf-color-titulos); margin: 0 0 2px; line-height: 1.25; }
-.portada .meta { font-size: 11px; color: var(--pdf-texto-suave); }
+/* Cabecera de la primera página */
+.portada { margin-bottom: 14px; }
+.portada-superior { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; margin-bottom: 22px; }
+.portada .logo { height: 49px; width: auto; }
+.portada-derecha { margin-left: auto; text-align: right; font-size: 11.3px; line-height: 1.55; color: var(--pdf-texto-suave); }
+.portada-derecha .etiqueta {
+  font-size: 10px; font-weight: bold; letter-spacing: 1.5px; text-transform: uppercase; color: var(--pdf-color-acento);
+}
+.portada h1 { font-size: 22.7px; font-weight: bold; color: var(--pdf-color-titulos); margin: 0 0 6px; line-height: 1.25; }
+.portada .descripcion { font-size: 12.7px; color: var(--pdf-texto-suave); margin: 0 0 6px; line-height: 1.4; }
+.portada .datos { font-size: 11.3px; color: var(--pdf-texto-tenue); margin-top: 5px; }
+.portada .datos .par { margin-right: 30px; }
+.portada .datos b { color: var(--pdf-texto-suave); }
 
-h2.seccion { font-size: 15px; font-weight: 600; color: var(--pdf-color-titulos); margin: 16px 0 8px; break-after: avoid; }
+h2.seccion { font-size: 15px; font-weight: bold; color: var(--pdf-color-titulos); margin: 16px 0 8px; break-after: avoid; }
 hr.divisor { border: 0; border-top: 1px solid var(--pdf-borde); margin: 8px 0 14px; }
 .fila { display: flex; gap: 12px; margin-bottom: 12px; break-inside: avoid; }
 .columna { display: flex; flex-direction: column; gap: 12px; }
 .tarjeta {
-  border: 1px solid var(--pdf-borde); border-radius: 8px; padding: 8px 10px;
+  border: 1px solid var(--pdf-borde); border-radius: 6px; padding: 8px 10px;
   break-inside: avoid; overflow: hidden; background: #fff;
 }
-.tarjeta h3 { font-size: 12.5px; font-weight: 600; color: var(--pdf-color-titulos); margin: 0 0 6px; }
+.tarjeta h3 { font-size: 12.5px; font-weight: bold; color: var(--pdf-color-titulos); margin: 0 0 6px; }
 .tarjeta .error { font-size: 11px; color: #b91c1c; background: #fef2f2; padding: 8px; border-radius: 4px; }
 .markdown { font-size: 12px; overflow: hidden; }
-.nota-filas { font-size: 10.5px; color: var(--pdf-texto-suave); text-align: right; margin-top: 4px; }
+.nota-filas { font-size: 10.5px; color: var(--pdf-texto-tenue); text-align: right; margin-top: 4px; }
 
-/* Ant Design (viene con Superset) aplica su propia familia a h1-h3: se fija la misma en todo el PDF. */
-.portada h1, .portada .meta, h2.seccion, .tarjeta h3, .nota-filas { font-family: var(--pdf-fuente) !important; }
+/* Ant Design y las tablas de Superset traen su propia familia: se fija la del PDF en todo el contenido. */
+.portada, .portada *, h2.seccion, .tarjeta, .tarjeta *:not(svg):not(path) { font-family: var(--pdf-fuente) !important; }
